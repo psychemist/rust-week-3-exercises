@@ -427,23 +427,6 @@ impl BitcoinTransaction {
     }
 }
 
-// impl Display for BitcoinTransaction {
-//     // fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), BitcoinError> {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
-//         write!(f, "Version: {}\nInput Count: {}\n", self.version, self.inputs.len());
-
-//         for i in 0..self.inputs.len() {
-//             write!(f, "Input {}: \n", i);
-//             // write!(f, "Previous Output Txid{}: \n", self.inputs[i].previous_output.txid.0);
-//         }
-
-//         // Display scriptSig length and bytes, and previous output info
-
-
-//         Ok(())
-//     }
-// }
-
 impl Display for BitcoinTransaction {
     // Format a user-friendly string showing version, inputs, lock_time
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
