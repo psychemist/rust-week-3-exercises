@@ -54,7 +54,7 @@ impl CompactSize {
 
             match prefix {
                 0..=252 => {
-                    let value = u8::from_le_bytes([prefix as u8]);
+                    let value = u8::from_le_bytes([prefix]);
                     Ok((Self::new(value as u64), 1))
                 }
                 253 => {
@@ -431,37 +431,49 @@ impl Display for BitcoinTransaction {
     // Format a user-friendly string showing version, inputs, lock_time
     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
         // Write "Version: " + version
-        write!(f, "Version: {}\n", self.version)?;
-        
+        writeln!(f, "Version: {}\n", self.version)?;
+
         // Write "Input Count: " + inputs.len()
-        write!(f, "Input Count: {}\n", self.inputs.len())?;
-        
+        writeln!(f, "Input Count: {}\n", self.inputs.len())?;
+
         // For each input (index i):
         for i in 0..self.inputs.len() {
             let input = &self.inputs[i];
-            
+
             // Write "Input " + i + ":"
-            write!(f, "Input {}:\n", i)?;
-            
+            writeln!(f, "Input {}:\n", i)?;
+
             // Write "  Previous Output Txid: " + hex(txid)
-            write!(f, "  Previous Output Txid: {}\n", encode(&input.previous_output.txid.0))?;
-            
+            writeln!(
+                f,
+                "  Previous Output Txid: {}\n",
+                encode(input.previous_output.txid.0)
+            )?;
+
             // Write "  Previous Output Vout: " + vout
-            write!(f, "  Previous Output Vout: {}\n", input.previous_output.vout)?;
-            
+            writeln!(
+                f,
+                "  Previous Output Vout: {}\n",
+                input.previous_output.vout
+            )?;
+
             // Write "  ScriptSig Length: " + script_sig.bytes.len()
-            write!(f, "  ScriptSig Length: {}\n", input.script_sig.bytes.len())?;
-            
+            writeln!(f, "  ScriptSig Length: {}\n", input.script_sig.bytes.len())?;
+
             // Write "  ScriptSig Bytes: " + hex(script_sig.bytes)
-            write!(f, "  ScriptSig Bytes: {}\n", encode(&input.script_sig.bytes))?;
-            
+            writeln!(
+                f,
+                "  ScriptSig Bytes: {}\n",
+                encode(&input.script_sig.bytes)
+            )?;
+
             // Write "  Sequence: " + sequence
-            write!(f, "  Sequence: {}\n", input.sequence)?;
+            writeln!(f, "  Sequence: {}\n", input.sequence)?;
         }
-        
+
         // Write "Lock Time: " + lock_time
-        write!(f, "Lock Time: {}", self.lock_time)?;
-        
+        writeln!(f, "Lock Time: {}", self.lock_time)?;
+
         // Return Ok
         Ok(())
     }
