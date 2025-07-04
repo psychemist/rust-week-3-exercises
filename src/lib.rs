@@ -3,11 +3,8 @@ use serde::{
     Deserialize, Deserializer, Serialize, Serializer,
     de::{Error, Visitor},
 };
+use std::fmt::{self, Display, Formatter};
 use std::ops::Deref;
-use std::{
-    fmt::{self, Display, Formatter},
-    io::Read,
-};
 
 #[derive(Debug, PartialEq, Eq, Clone, Serialize, Deserialize)]
 pub struct CompactSize {
@@ -46,7 +43,7 @@ impl CompactSize {
 
     // Decode CompactSize, returning value and number of bytes consumed.
     pub fn from_bytes(bytes: &[u8]) -> Result<(Self, usize), BitcoinError> {
-        // First check if bytes is empty.
+        // Check if bytes is empty.
         let len = bytes.len();
 
         if len == 0 {
@@ -57,19 +54,15 @@ impl CompactSize {
 
             match prefix {
                 0..=252 => {
-                    // if len != 1 {
-                    //     Err(BitcoinError::InvalidFormat)
-                    // } else {
-                        let value = u8::from_le_bytes([prefix as u8]);
-                        Ok((Self::new(value as u64), 1))
-                    // }
+                    let value = u8::from_le_bytes([prefix as u8]);
+                    Ok((Self::new(value as u64), 1))
                 }
                 253 => {
                     if len < 3 {
-                        Err(BitcoinError::InvalidFormat)
+                        Err(BitcoinError::InsufficientBytes)
                     } else {
                         let mut bytes_array = [0; 2];
-                        bytes_array.copy_from_slice(&bytes[1..]);
+                        bytes_array.copy_from_slice(&bytes[1..3]);
 
                         let value = u16::from_le_bytes(bytes_array);
                         Ok((Self::new(value as u64), 3))
@@ -77,10 +70,10 @@ impl CompactSize {
                 }
                 254 => {
                     if len < 5 {
-                        Err(BitcoinError::InvalidFormat)
+                        Err(BitcoinError::InsufficientBytes)
                     } else {
                         let mut bytes_array = [0; 4];
-                        bytes_array.copy_from_slice(&bytes[1..]);
+                        bytes_array.copy_from_slice(&bytes[1..5]);
 
                         let value = u32::from_le_bytes(bytes_array);
                         Ok((Self::new(value as u64), 5))
@@ -88,10 +81,10 @@ impl CompactSize {
                 }
                 255 => {
                     if len < 9 {
-                        Err(BitcoinError::InvalidFormat)
+                        Err(BitcoinError::InsufficientBytes)
                     } else {
                         let mut bytes_array = [0; 8];
-                        bytes_array.copy_from_slice(&bytes[1..]);
+                        bytes_array.copy_from_slice(&bytes[1..9]);
 
                         let value = u64::from_le_bytes(bytes_array);
                         Ok((Self::new(value), 9))
@@ -127,6 +120,13 @@ impl<'de> Visitor<'de> for StringVisitor {
     }
 
     fn visit_string<E>(self, value: String) -> Result<Self::Value, E>
+    where
+        E: Error,
+    {
+        Ok(value)
+    }
+
+    fn visit_str<E>(self, value: &str) -> Result<Self::Value, E>
     where
         E: Error,
     {
@@ -232,14 +232,6 @@ impl Script {
             return Err(BitcoinError::InsufficientBytes);
         }
 
-        // Parse CompactSize prefix and read that many bytes from slice
-        // let prefix = bytes[0] as usize;
-        // let script_bytes = &bytes[1..=prefix];
-        // let script = Script::new(Vec::from(script_bytes));
-
-        // Ok((script, prefix + 1))
-
-
         // Parse CompactSize prefix to get script length
         let (compact_size, size_consumed) = CompactSize::from_bytes(bytes)?;
         let script_len = compact_size.value as usize;
@@ -329,7 +321,6 @@ impl TransactionInput {
                         script_sig,
                         sequence,
                     };
-                    // dbg!(tx_input.clone());
 
                     Ok((tx_input, total_bytes_consumed))
                 }
@@ -403,22 +394,14 @@ impl BitcoinTransaction {
             let input_count = compact_size.value as usize;
             offset += size_consumed;
 
-            // let mut size_buffer = vec![0u8; 1];
-            // let mut mut_bytes = bytes;
-            // let _ = mut_bytes.read_exact(&mut size_buffer);
-            // let size = size_buffer[0];
-            // offset += size_buffer.len();
-
             // Parse and create transaction inputs
             let mut inputs: Vec<TransactionInput> = vec![];
-            // for _ in 0..size {
-                for _ in 0..input_count {
-                    if bytes_len < offset {
-                        return Err(BitcoinError::InsufficientBytes);
+            for _ in 0..input_count {
+                if bytes_len < offset {
+                    return Err(BitcoinError::InsufficientBytes);
                 }
 
-                let (tx_input, input_size) =
-                    TransactionInput::from_bytes(&bytes[offset..])?;
+                let (tx_input, input_size) = TransactionInput::from_bytes(&bytes[offset..])?;
                 inputs.push(tx_input);
                 offset += input_size;
             }
@@ -430,6 +413,7 @@ impl BitcoinTransaction {
                 let lock_time = u32::from_le_bytes(bytes[offset..offset + 4].try_into().unwrap());
                 let total_bytes_consumed = offset + 4;
 
+                // Return formatted BitcoinTransaction
                 Ok((
                     BitcoinTransaction {
                         version,
@@ -439,14 +423,63 @@ impl BitcoinTransaction {
                     total_bytes_consumed,
                 ))
             }
-            // }
         }
     }
 }
 
 // impl Display for BitcoinTransaction {
-//     fn fmt(&self, f: &mut Formatter<'_>) -> Result {
-//         // Format a user-friendly string showing version, inputs, lock_time
+//     // fn fmt(&self, f: &mut Formatter<'_>) -> Result<(), BitcoinError> {
+//     fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+//         write!(f, "Version: {}\nInput Count: {}\n", self.version, self.inputs.len());
+
+//         for i in 0..self.inputs.len() {
+//             write!(f, "Input {}: \n", i);
+//             // write!(f, "Previous Output Txid{}: \n", self.inputs[i].previous_output.txid.0);
+//         }
+
 //         // Display scriptSig length and bytes, and previous output info
+
+
+//         Ok(())
 //     }
 // }
+
+impl Display for BitcoinTransaction {
+    // Format a user-friendly string showing version, inputs, lock_time
+    fn fmt(&self, f: &mut Formatter<'_>) -> fmt::Result {
+        // Write "Version: " + version
+        write!(f, "Version: {}\n", self.version)?;
+        
+        // Write "Input Count: " + inputs.len()
+        write!(f, "Input Count: {}\n", self.inputs.len())?;
+        
+        // For each input (index i):
+        for i in 0..self.inputs.len() {
+            let input = &self.inputs[i];
+            
+            // Write "Input " + i + ":"
+            write!(f, "Input {}:\n", i)?;
+            
+            // Write "  Previous Output Txid: " + hex(txid)
+            write!(f, "  Previous Output Txid: {}\n", encode(&input.previous_output.txid.0))?;
+            
+            // Write "  Previous Output Vout: " + vout
+            write!(f, "  Previous Output Vout: {}\n", input.previous_output.vout)?;
+            
+            // Write "  ScriptSig Length: " + script_sig.bytes.len()
+            write!(f, "  ScriptSig Length: {}\n", input.script_sig.bytes.len())?;
+            
+            // Write "  ScriptSig Bytes: " + hex(script_sig.bytes)
+            write!(f, "  ScriptSig Bytes: {}\n", encode(&input.script_sig.bytes))?;
+            
+            // Write "  Sequence: " + sequence
+            write!(f, "  Sequence: {}\n", input.sequence)?;
+        }
+        
+        // Write "Lock Time: " + lock_time
+        write!(f, "Lock Time: {}", self.lock_time)?;
+        
+        // Return Ok
+        Ok(())
+    }
+}
